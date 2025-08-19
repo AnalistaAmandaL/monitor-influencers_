@@ -1,23 +1,26 @@
 #!/usr/bin/env bash
 
-echo "--- Instalando o Google Chrome ---"
+echo "--- Instalando o Google Chrome e dependências ---"
 
 # Atualiza a lista de pacotes
 sudo apt-get update
 
-# Instala o wget para baixar o arquivo .deb
-sudo apt-get install -y wget
+# Instala dependências e utilitários
+sudo apt-get install -y wget gnupg
 
-# Baixa o pacote de instalação do Google Chrome
-wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+# Baixa e adiciona a chave GPG do repositório do Google
+wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
 
-# Instala o pacote .deb
-sudo dpkg -i google-chrome-stable_current_amd64.deb
+# Adiciona o repositório do Chrome às fontes de software
+echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
 
-# Corrige dependências quebradas
-sudo apt-get install -f -y
+# Atualiza a lista de pacotes novamente para incluir o novo repositório
+sudo apt-get update
+
+# Instala o Google Chrome
+sudo apt-get install -y google-chrome-stable
+
+# Corrige permissões e outras dependências
+sudo chmod +x /usr/bin/google-chrome
 
 echo "--- Google Chrome instalado com sucesso ---"
-
-# Define a variável de ambiente (opcional, mas uma boa prática)
-echo 'export CHROME_PATH="/usr/bin/google-chrome"' >> ~/.profile
