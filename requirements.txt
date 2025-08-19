@@ -3,4 +3,3 @@ pandas
 plotly
 selenium
 requests
-webdriver-manager
