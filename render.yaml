@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: meu-monitor-de-influencers
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run app.py
+    envVars:
+      - key: CHROME_PATH
+        value: /usr/bin/google-chrome
