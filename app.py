@@ -156,26 +156,23 @@ conn, cursor = init_db()
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
 
 def setup_driver():
-    options = Options()
-    options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--window-size=1920x1080")
-    options.add_argument("--incognito")
-    options.add_argument("--log-level=3")
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--incognito")
+    chrome_options.add_argument("--log-level=3")
 
-    # Define o caminho do executável do Chrome
-    options.binary_location = "/usr/bin/google-chrome"
+    # Caminho do Chrome e ChromeDriver no Heroku
+    chrome_options.binary_location = "/app/.apt/usr/bin/google-chrome"
 
-    # Instala o ChromeDriver e configura o serviço
-    service = Service(ChromeDriverManager().install())
+    # O Service para Heroku
+    service = Service(executable_path="/app/.chromedriver/bin/chromedriver")
 
-    driver = webdriver.Chrome(service=service, options=options)
+    driver = webdriver.Chrome(service=service, options=chrome_options)
     return driver
-
 # ==============================================
 # FUNÇÕES DE SCRAPING
 # ==============================================
