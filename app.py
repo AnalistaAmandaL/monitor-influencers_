@@ -161,11 +161,11 @@ def setup_driver():
     chrome_options.add_argument("--incognito")
     chrome_options.add_argument("--log-level=3")
 
-    # Caminho do Chrome para o Render
-    chrome_options.binary_location = "/usr/bin/google-chrome"
+    # Caminho do Chrome e ChromeDriver no Heroku
+    chrome_options.binary_location = "/app/.apt/usr/bin/google-chrome"
 
-    # Instala o ChromeDriver
-    service = Service(ChromeDriverManager().install())
+    # O Service para Heroku
+    service = Service(executable_path="/app/.chromedriver/bin/chromedriver")
 
     driver = webdriver.Chrome(service=service, options=chrome_options)
     return driver
