@@ -153,10 +153,6 @@ conn, cursor = init_db()
 # ==============================================
 # CONFIGURAÇÃO DO SELENIUM PARA AMBIENTES HEADLESS
 # ==============================================
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-
 def setup_driver():
     chrome_options = Options()
     chrome_options.add_argument("--headless")
@@ -165,11 +161,11 @@ def setup_driver():
     chrome_options.add_argument("--incognito")
     chrome_options.add_argument("--log-level=3")
 
-    # Caminho do Chrome e ChromeDriver no Heroku
-    chrome_options.binary_location = "/app/.apt/usr/bin/google-chrome"
+    # Caminho do Chrome para o Render
+    chrome_options.binary_location = "/usr/bin/google-chrome"
 
-    # O Service para Heroku
-    service = Service(executable_path="/app/.chromedriver/bin/chromedriver")
+    # Instala o ChromeDriver
+    service = Service(ChromeDriverManager().install())
 
     driver = webdriver.Chrome(service=service, options=chrome_options)
     return driver
