@@ -16,3 +16,8 @@ sudo apt-get update
 sudo apt-get install -y google-chrome-stable
 
 echo "--- Google Chrome instalado com sucesso ---"
+
+# ... (seu script de instalação do Chrome) ...
+
+# Adicione esta linha para verificar a versão e imprimi-la no log do Render
+google-chrome --version
