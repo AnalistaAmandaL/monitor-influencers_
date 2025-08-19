@@ -2,3 +2,6 @@ streamlit
 pandas
 plotly
 selenium
+sqlite3
+requests
+webdriver-manager
