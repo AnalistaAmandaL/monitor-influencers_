@@ -162,13 +162,8 @@ def setup_driver():
     options.add_argument("--incognito")
     options.add_argument("--log-level=3")
 
-    # Adiciona a configuração de user-agent
-    options.add_argument(
-        "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36")
-
-    # Configuração para ambientes de nuvem (Streamlit Cloud, Heroku, etc.)
-    if "CHROME_PATH" in os.environ:
-        options.binary_location = os.environ["CHROME_PATH"]
+    # Define o caminho do executável do Chrome
+    options.binary_location = "/usr/bin/google-chrome" # <--- Linha a ser verificada/adicionada
 
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=options)
