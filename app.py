@@ -8,14 +8,7 @@ import os
 import requests
 import json
 import time
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.common.exceptions import TimeoutException, WebDriverException, NoSuchElementException
+from playwright.sync_api import sync_playwright
 
 # ==============================================
 # CONFIGURAÇÃO INICIAL DO APP
@@ -73,6 +66,27 @@ st.markdown(
 """, unsafe_allow_html=True
 )
 
+# ...existing code...
+def convert_to_int(text):
+    """Converte texto do TikTok (ex: '1.2M') para inteiro."""
+    text = text.replace(',', '').replace('.', '')
+    if 'K' in text:
+        return int(float(text.replace('K', '')) * 1000)
+    elif 'M' in text:
+        return int(float(text.replace('M', '')) * 1000000)
+    elif 'B' in text:
+        return int(float(text.replace('B', '')) * 1000000000)
+    else:
+        try:
+            return int(text)
+        except:
+            return 0
+
+def estimate_earnings(views):
+    """Estimativa simples de ganhos baseada em visualizações."""
+    # Ajuste conforme sua lógica
+    return views * 0.01
+# ...existing code...
 
 # ==============================================
 # BANCO DE DADOS
@@ -151,133 +165,89 @@ conn, cursor = init_db()
 
 
 # ==============================================
-# CONFIGURAÇÃO DO SELENIUM PARA AMBIENTES HEADLESS
+# CONFIGURAÇÃO DO PLAYWRIGHT E NAVEGADOR
 # ==============================================
-def setup_driver():
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--incognito")
-    chrome_options.add_argument("--log-level=3")
+def setup_playwright():
+    p = sync_playwright().start()
+    browser = p.chromium.launch(headless=True)
+    return p, browser
 
-    # Caminho do Chrome e ChromeDriver no Heroku
-    chrome_options.binary_location = "/app/.apt/usr/bin/google-chrome"
-
-    # O Service para Heroku
-    service = Service(executable_path="/app/.chromedriver/bin/chromedriver")
-
-    driver = webdriver.Chrome(service=service, options=chrome_options)
-    return driver
 # ==============================================
 # FUNÇÕES DE SCRAPING
 # ==============================================
-def convert_to_int(s):
-    if 'K' in s:
-        return int(float(s.replace('K', '').strip()) * 1000)
-    elif 'M' in s:
-        return int(float(s.replace('M', '').strip()) * 1000000)
-    else:
-        try:
-            return int(s.replace(',', '').strip())
-        except (ValueError, AttributeError):
-            return 0
-
-
 def get_tiktok_data_from_scraping(username):
-    driver = None
     try:
-        timeout = 1200
-        driver = setup_driver()
-        driver.set_page_load_timeout(timeout)
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36"
+            )
+            page = context.new_page()
 
-        st.info(f"Conectando ao TikTok para buscar dados de @{username}...")
-        driver.get(f"https://www.tiktok.com/@{username}")
+            st.info(f"Conectando ao TikTok para buscar dados de @{username}...")
+            page.goto(f"https://www.tiktok.com/@{username}", timeout=120000)
 
-        wait = WebDriverWait(driver, timeout)
+            followers_elem = page.locator("xpath=//strong[@data-e2e='followers-count']")
+            likes_elem = page.locator("xpath=//strong[@data-e2e='likes-count']")
 
-        # Espera que o elemento da contagem de seguidores esteja presente
-        followers_elem = wait.until(EC.presence_of_element_located((By.XPATH, "//strong[@data-e2e='followers-count']")))
-        likes_elem = wait.until(EC.presence_of_element_located((By.XPATH, "//strong[@data-e2e='likes-count']")))
+            # Wait for elements to be visible
+            followers_elem.wait_for(state="visible")
+            likes_elem.wait_for(state="visible")
 
-        followers_num = convert_to_int(followers_elem.text)
-        likes_num = convert_to_int(likes_elem.text)
-        views_num = likes_num
+            followers_num = convert_to_int(followers_elem.inner_text())
+            likes_num = convert_to_int(likes_elem.inner_text())
+            views_num = likes_num
 
-        return {
-            'seguidores': followers_num,
-            'curtidas': likes_num,
-            'visualizacoes': views_num
-        }
+            return {
+                'seguidores': followers_num,
+                'curtidas': likes_num,
+                'visualizacoes': views_num
+            }
 
-    except TimeoutException:
-        st.error(
-            "Erro: O tempo limite para carregar a página ou encontrar elementos foi excedido. O influencer pode não existir ou a conexão está lenta.")
+    except TimeoutError:
+        st.error("Erro: O tempo limite para carregar a página ou encontrar elementos foi excedido. O influencer pode não existir ou a conexão está lenta.")
         return None
-    except NoSuchElementException:
-        st.error(f"Erro: Não foi possível encontrar os elementos 'seguidores' ou 'curtidas' na página de @{username}.")
-        return None
-    except WebDriverException as e:
-        st.error(f"Erro no WebDriver. Por favor, verifique a compatibilidade do Chrome/ChromeDriver. Erro: {str(e)}")
+    except PlaywrightError as e:
+        st.error(f"Erro do Playwright. Verifique a página do influencer. Erro: {str(e)}")
         return None
     except Exception as e:
         st.error(f"Erro inesperado no scraping: {str(e)}")
         return None
-    finally:
-        if driver:
-            driver.quit()
 
+# ...existing code...
+conn, cursor = init_db()
 
-def get_live_data_from_scraping(username):
-    driver = None
-    live_data = {'live_curtidas': 0, 'live_visualizacoes': 0}
-    try:
-        timeout = 500
-        driver = setup_driver()
-        driver.set_page_load_timeout(timeout)
-
-        st.info(f"Procurando por lives ativas de @{username}...")
-        driver.get(f"https://www.tiktok.com/@{username}")
-
-        live_link_xpath = "//a[contains(@href, '/live')]"
+# ==============================================
+# FUNÇÕES UTILITÁRIAS
+# ==============================================
+def convert_to_int(text):
+    """Converte texto do TikTok (ex: '1.2M') para inteiro."""
+    text = text.replace(',', '').replace('.', '')
+    if 'K' in text:
+        return int(float(text.replace('K', '')) * 1000)
+    elif 'M' in text:
+        return int(float(text.replace('M', '')) * 1000000)
+    elif 'B' in text:
+        return int(float(text.replace('B', '')) * 1000000000)
+    else:
         try:
-            live_link = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.XPATH, live_link_xpath))
-            )
-            driver.get(live_link.get_attribute('href'))
+            return int(text)
+        except:
+            return 0
 
-            try:
-                live_views = WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'live-viewer-count')]"))
-                ).text
-                live_likes = WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'live-likes-count')]"))
-                ).text
+def estimate_earnings(views):
+    """Estimativa simples de ganhos baseada em visualizações."""
+    # Ajuste conforme sua lógica
+    return views * 0.01
 
-                live_data['live_visualizacoes'] = convert_to_int(live_views.split()[0])
-                live_data['live_curtidas'] = convert_to_int(live_likes.split()[0])
-                st.success(
-                    f"Dados de live encontrados: Visualizações: {live_data['live_visualizacoes']:,}, Curtidas: {live_data['live_curtidas']:,}")
-            except TimeoutException:
-                st.warning("Não foi possível encontrar as métricas da live. O layout pode ter mudado.")
-
-        except TimeoutException:
-            st.info(f"Nenhuma live ativa encontrada para @{username} no momento.")
-    except Exception as e:
-        st.error(f"Erro inesperado ao buscar dados de live: {str(e)}")
-    finally:
-        if driver:
-            driver.quit()
-    return live_data
-
-
-def estimate_earnings(visualizacoes):
-    cpm_valor = 0.05
-    if visualizacoes > 0:
-        return (visualizacoes / 1000) * cpm_valor
-    return 0.0
-
-
+# ==============================================
+# CONFIGURAÇÃO DO PLAYWRIGHT PARA AMBIENTES HEADLESS
+# ==============================================
+def setup_playwright():
+    p = sync_playwright().start()
+    browser = p.chromium.launch(headless=True)
+    return p, browser
+# ...existing code...
 # ==============================================
 # FUNÇÕES DO APLICATIVO
 # ==============================================
